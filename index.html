@@ -1,29 +1,182 @@
-Hello World!
 <!DOCTYPE html>
 <html>
-	<head>
-		<title>Geospatial Project Atlas</title>
-	</head>
-	<body>
-		<nav>
-    		<ul>
-        		<li><a href="/">Home</a></li>
-	        	<li><a href="/about">Introduction</a></li>
-        		<li><a href="/cv">Resume</a></li>
-        		<li><a href="/blog">Blog</a></li>
-    		</ul>
-		</nav>
-		<div class="container">
-    		<div class="blurb">
-        		<h1>Hi there, I'm Nadine Trahan</h1>
-				<p>I amd a geospatial analyst specializing in socio-ecological health<em>A Touch of Evil</em> Don't trust me. <a href="/about">Read more about my life...</a></p>
-    		</div><!-- /.blurb -->
-		</div><!-- /.container -->
-		<footer>
-    		<ul>
-        		<li><a href="mailto:nadinetrahan@gmail.com">email</a></li>
-        		<li><a href="https://github.com/gaianian/project-atlas/index.html">github.com/gaianian</a></li>
-			</ul>
-		</footer>
-	</body>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Access features with pointer events - 4.9</title>
+
+  <style>
+    html,
+    body,
+    #viewDiv {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+      width: 100%;
+    }
+
+    #info {
+      background-color: #3a2613;
+      opacity: 0.75;
+      color: #ffffe6;
+      font-size: 18pt;
+      padding: 8px;
+      visibility: hidden;
+    }
+  </style>
+
+  <link rel="stylesheet" href="https://js.arcgis.com/4.9/esri/css/main.css">
+  <script src="https://js.arcgis.com/4.9/"></script>
+
+  <script>
+    require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+      "esri/WebMap"
+    
+    ], function(
+      Map,
+      MapView,
+      FeatureLayer,
+      WebMap
+    ) {
+
+      const hurricanesLayer = new FeatureLayer({
+        url: "https://services3.arcgis.com/vgLlUDDBbJPy7ryV/arcgis/rest/services/ProjectPoints/FeatureServer/0",
+        outFields: ["*"]
+      });
+
+      const map = new WebMap({
+        portalItem: { // autocasts as new PortalItem()
+          id: "d552c3ec98ad488e9e26801d36d6a42e"
+        }
+      });
+      
+      map.add(hurricanesLayer);
+
+      
+      //new Map({
+        //basemap: "dark-gray",
+       // layers: [hurricanesLayer]
+      //});
+
+      const view = new MapView({
+        map: map,
+        container: "viewDiv",
+        center: [-110, 7.6],
+        zoom: 2
+        
+        //center: [-61.125537, 35.863534]
+      });
+      
+      //new MapView({
+       // container: "viewDiv",
+       // map: map,
+       // center: [-61.125537, 35.863534],
+       // zoom: 4,
+       // highlightOptions: {
+         // color: "orange"
+      //  }
+     // });
+
+      view.ui.add("info", "top-right");
+
+      view.when().then(function() {
+        return hurricanesLayer.when();
+      }).then(function(layer) {
+        const renderer = layer.renderer.clone();
+        renderer.symbol.size = 13;
+        renderer.symbol.color = [251, 251, 251, 0.1];
+        layer.renderer = renderer;
+
+        // Set up an event handler for pointer-down (mobile)
+        // and pointer-move events (mouse)
+        // and retrieve the screen x, y coordinates
+
+        return view.whenLayerView(layer);
+      }).then(function(layerView) {
+        view.on("pointer-move", eventHandler);
+        view.on("pointer-down", eventHandler);
+
+        function eventHandler(event) {
+          // the hitTest() checks to see if any graphics in the view
+          // intersect the x, y coordinates of the pointer
+          view.hitTest(event)
+            .then(getGraphics);
+        }
+
+        let highlight, currentYear, currentName;
+
+        function getGraphics(response) {
+
+          // the topmost graphic from the hurricanesLayer
+          // and display select attribute values from the
+          // graphic to the user
+          if (response.results.length) {
+            const graphic = response.results.filter(function(result) {
+              return result.graphic.layer === hurricanesLayer;
+            })[0].graphic;
+
+            const attributes = graphic.attributes;
+            const category = attributes.CAT;
+            const wind = attributes.WIND_KTS;
+            const name = attributes.NAME;
+            const year = attributes.YEAR;
+            const id = attributes.OBJECTID;
+
+            if (highlight && (currentName !== name || currentYear !==
+                year)) {
+              highlight.remove();
+              highlight = null;
+              return;
+            }
+
+            document.getElementById("info").style.visibility =
+              "visible";
+            document.getElementById("name").innerHTML = name;
+            document.getElementById("category").innerHTML = "Category " +
+              category;
+            document.getElementById("wind").innerHTML = wind + " kts";
+
+            // highlight all features belonging to the same hurricane as the feature
+            // returned from the hitTest
+            const query = layerView.layer.createQuery();
+            query.where = "NAME = '" + name +
+              "'";
+            layerView.queryObjectIds(query)
+              .then(function(ids) {
+                highlight = layerView.highlight(ids);
+                currentYear = year;
+                currentName = name;
+              });
+
+          } else {
+            // remove the highlight if no features are
+            // returned from the hitTest
+            highlight.remove();
+            highlight = null;
+            document.getElementById("info").style.visibility = "hidden";
+          }
+        }
+
+      });
+
+    });
+  </script>
+</head>
+
+<body>
+  <div id="viewDiv"></div>
+  <div id="info">
+    <span id="name"></span>
+    <br>
+    <span id="category"></span>
+    <br>
+    <span id="wind"></span>
+  </div>
+</body>
+
+
 </html>
